@@ -46,14 +46,21 @@ export interface ParsedBookRules {
 export function parseBookRules(raw: string): ParsedBookRules {
   // Strip markdown code block wrappers if present (LLM often wraps output in ```md ... ```)
   const stripped = raw.replace(/^```(?:md|markdown|yaml)?\s*\n/, "").replace(/\n```\s*$/, "");
-  const fmMatch = stripped.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
-  if (!fmMatch) {
-    throw new Error("book_rules.md missing YAML frontmatter (--- ... ---)");
+
+  // Try to find YAML frontmatter anywhere in the text (not just at the start)
+  const fmMatch = stripped.match(/---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
+  if (fmMatch) {
+    try {
+      const frontmatter = yaml.load(fmMatch[1]) as Record<string, unknown>;
+      const rules = BookRulesSchema.parse(frontmatter);
+      const body = fmMatch[2].trim();
+      return { rules, body };
+    } catch {
+      // YAML parse failed — fall through to default
+    }
   }
 
-  const frontmatter = yaml.load(fmMatch[1]) as Record<string, unknown>;
-  const rules = BookRulesSchema.parse(frontmatter);
-  const body = fmMatch[2].trim();
-
-  return { rules, body };
+  // No valid frontmatter found — return default rules with the raw content as body
+  const rules = BookRulesSchema.parse({});
+  return { rules, body: stripped.trim() };
 }

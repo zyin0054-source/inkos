@@ -50,7 +50,10 @@ export class StateManager {
   async loadBookConfig(bookId: string): Promise<BookConfig> {
     const configPath = join(this.bookDir(bookId), "book.json");
     const raw = await readFile(configPath, "utf-8");
-    return JSON.parse(raw);
+    if (!raw.trim()) {
+      throw new Error(`book.json is empty for book "${bookId}"`);
+    }
+    return JSON.parse(raw) as BookConfig;
   }
 
   async saveBookConfig(bookId: string, config: BookConfig): Promise<void> {
